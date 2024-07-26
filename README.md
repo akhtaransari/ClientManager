@@ -73,11 +73,11 @@ This is a Customer Management CRUD application built using Spring Boot for the b
 
 ### Authentication
 
-- **Login**: `POST /api/auth/login`
+- **Login**: `POST /api/customers/login`
     ```json
     {
-        "username": "test@sunbasedata.com",
-        "password": "Test@123"
+        "username": "contact-admin",
+        "password": "contact-admin"
     }
     ```
     - Returns a JWT token for authenticated requests.
