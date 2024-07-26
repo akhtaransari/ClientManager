@@ -1,4 +1,3 @@
-``` markdown
 # Customer Management Application
 
 ## Overview
@@ -40,7 +39,7 @@ This is a Customer Management CRUD application built using Spring Boot for the b
     - Update the `application.properties` file in the `src/main/resources` directory with your MySQL credentials.
 
     ```properties
-    spring.datasource.url=your-mysql-database-url
+    spring.datasource.url=jdbc:mysql://localhost:3306/customer_db
     spring.datasource.username=your_username
     spring.datasource.password=your_password
     spring.jpa.hibernate.ddl-auto=update
@@ -74,11 +73,11 @@ This is a Customer Management CRUD application built using Spring Boot for the b
 
 ### Authentication
 
-- **Login**: `POST /api/customers/login`
+- **Login**: `POST /api/auth/login`
     ```json
     {
-        "username": "contact-assigment-provder",
-        "password": "contact-assigment-provder"
+        "username": "test@sunbasedata.com",
+        "password": "Test@123"
     }
     ```
     - Returns a JWT token for authenticated requests.
@@ -151,4 +150,3 @@ Contributions are welcome! Please fork the repository and create a pull request 
 ## License
 
 This project is licensed under the MIT License.
-  ```
