@@ -131,11 +131,16 @@ This is a Customer Management CRUD application built using Spring Boot for the b
 3. **Add/Edit Customer Screen**: Form to add a new customer or edit an existing customer.
 
 ## Frontend Screenshots 
-![Login](/Login.jpeg)
-![Dashboard](/Dashboard.jpeg)
-![Add Customer](/Add-Customer.jpeg)
-![Edit Customer](/Edit-Customer.jpeg)
-![Search By Type](/Search-by-type.jpeg)
+### Login
+![Login](/screenshots/Login.jpeg)
+### Dashboard
+![Dashboard](/screenshots/Dashboard.jpeg)
+### Add Customer
+![Add Customer](/screenshots/Add-Customer.jpeg)
+### Edit Customer
+![Edit Customer](/screenshots/Edit-Customer.jpeg)
+### Search By Type
+![Search By Type](/screenshots/Search-by-type.jpeg)
 
 
 ## Synchronization
