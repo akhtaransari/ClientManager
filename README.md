@@ -130,6 +130,14 @@ This is a Customer Management CRUD application built using Spring Boot for the b
 2. **Customer List Screen**: Displays a list of customers with options to add, update, or delete customers.
 3. **Add/Edit Customer Screen**: Form to add a new customer or edit an existing customer.
 
+## Frontend Screenshots 
+![Login](/Login.jpeg)
+![Dashboard](/Dashboard.jpeg)
+![Add Customer](/Add-Customer.jpeg)
+![Edit Customer](/Edit-Customer.jpeg)
+![Search By Type](/Search-by-type.jpeg)
+
+
 ## Synchronization
 
 To synchronize customer data, click the "Sync" button on the Customer List screen. This will fetch the customer list from the remote API and update the local database accordingly.
