@@ -122,6 +122,11 @@ This is a Customer Management CRUD application built using Spring Boot for the b
 ### Data Synchronization
 
 - **Sync Customers**: `POST /api/customers/sync`
+   ```json
+    {
+        "password": "your-password"
+    }
+    ```
     - Fetches customer data from the remote API and updates the local database.
 
 ## Frontend Screens

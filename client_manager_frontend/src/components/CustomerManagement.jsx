@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import AddCustomerModal from "./AddCustomerModal";
 import EditCustomerModal from "./EditCustomerModal";
+import SyncModal from "./SyncModal";
 
 // Component for managing customers
 const CustomerManagement = () => {
@@ -38,9 +39,16 @@ const CustomerManagement = () => {
       // Construct URL with query parameters for pagination and search
       const url = `http://localhost:8080/api/customers?page=${currentPage}&size=${pageSize}&sortBy=${searchType}&value=${searchQuery}`;
 
+      // Get the JWT token from local storage
+      const token = localStorage.getItem("token");
+
       // Make the GET request to fetch customer data
-      const response = await axios.get(url);
-      console.log(response);
+      const response = await axios.get(url, {
+        headers: {
+          Authorization: `Bearer ${token}`, // Include JWT token in the Authorization header
+          "Content-Type": "application/json",
+        },
+      });
 
       // Update state with the response data
       setCustomers(response.data.content); // Adjust according to actual response structure
@@ -82,8 +90,17 @@ const CustomerManagement = () => {
     setShowEditModal(true);
   };
 
-  // Function to handle synchronizationß
-  const handleSync = async () => {
+  // Add these to your existing state declarations
+  const [showSyncModal, setShowSyncModal] = useState(false);
+
+  // Function to open the sync modal
+  const handleSyncModalOpen = () => setShowSyncModal(true);
+
+  // Function to close the sync modal
+  const handleSyncModalClose = () => setShowSyncModal(false);
+
+  // Function to handle synchronization
+  const handleSync = async (password) => {
     try {
       // Retrieve the token from localStorage
       const token = localStorage.getItem("token");
@@ -93,15 +110,24 @@ const CustomerManagement = () => {
         throw new Error("No token found in localStorage");
       }
 
-      // Construct the URL with the token
-      const url = `http://localhost:8080/api/customers/sync/${token}`;
+      // Construct the URL
+      const url = `http://localhost:8080/api/customers/sync`;
 
-      // Make the GET request
-      const response = await axios.get(url);
+      // Make the POST request
+      const response = await axios.post(
+        url,
+        { password },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`, // Include JWT token in the Authorization header
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
-      // Handle the response as needed
-      fetchCustomers();
-      alert("Sync completed successfully.");
+      fetchCustomers(); // Refresh the customer list
+      alert(response.data);
+      handleSyncModalClose(); // Close the sync modal
     } catch (error) {
       // Handle any errors that occurred during the request
       console.error("Error syncing data:", error);
@@ -112,10 +138,24 @@ const CustomerManagement = () => {
   // Delete a customer by ID
   const handleDeleteCustomer = async (id) => {
     try {
-      await axios.delete(`http://localhost:8080/api/customers/${id}`);
-      fetchCustomers(); // Refresh customer list after deletion
+      // Get the JWT token from local storage
+      const token = localStorage.getItem("token");
+
+      // Make the DELETE request to delete the customer
+      await axios.delete(`http://localhost:8080/api/customers/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`, // Include JWT token in the Authorization header
+          "Content-Type": "application/json",
+        },
+      });
+
+      // Refresh the customer list after deletion
+      fetchCustomers();
+
+      // Alert the user about the successful deletion
       alert(`Customer with ID ${id} deleted successfully.`);
     } catch (error) {
+      // Log and alert the error if the deletion fails
       console.error("Error deleting customer:", error);
       alert(`Failed to delete customer with ID ${id}.`);
     }
@@ -132,7 +172,10 @@ const CustomerManagement = () => {
           >
             Add Customer
           </button>
-          <button className="btn btn-secondary mb-3" onClick={handleSync}>
+          <button
+            className="btn btn-secondary mb-3"
+            onClick={handleSyncModalOpen}
+          >
             Sync
           </button>
         </div>
@@ -190,7 +233,7 @@ const CustomerManagement = () => {
         <tbody>
           {customers.length > 0 ? (
             customers.map((customer) => (
-              <tr key={customer.id}>
+              <tr key={customer.uuid}>
                 <td>{customer.firstName}</td>
                 <td>{customer.lastName}</td>
                 <td>{customer.street}</td>
@@ -200,16 +243,15 @@ const CustomerManagement = () => {
                 <td>{customer.email}</td>
                 <td>{customer.phone}</td>
                 <td>
-                  {/* Edit and Delete buttons for each customer */}
                   <button
                     className="btn btn-success btn-sm me-2"
-                    onClick={() => handleEditCustomer(customer.id)}
+                    onClick={() => handleEditCustomer(customer.uuid)}
                   >
                     Edit
                   </button>
                   <button
                     className="btn btn-danger btn-sm"
-                    onClick={() => handleDeleteCustomer(customer.id)}
+                    onClick={() => handleDeleteCustomer(customer.uuid)}
                   >
                     Delete
                   </button>
@@ -263,9 +305,9 @@ const CustomerManagement = () => {
         </ul>
       </nav>
 
-      {/* Modals for adding and editing customers */}
+      {/* Modals for adding, editing, and syncing customers */}
       <AddCustomerModal
-        show={showModal}
+        show={showAddModal}
         handleClose={handleCloseModal}
         fetchCustomers={fetchCustomers}
       />
@@ -274,6 +316,11 @@ const CustomerManagement = () => {
         handleClose={handleCloseEditModal}
         customerId={selectedCustomerId}
         fetchCustomers={fetchCustomers}
+      />
+      <SyncModal
+        show={showSyncModal}
+        handleClose={handleSyncModalClose}
+        handleSync={handleSync}
       />
     </div>
   );

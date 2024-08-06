@@ -107,7 +107,7 @@ public class CustomerController {
      * @param password the password object containing the user's password
      * @return a response entity with the synchronization status and HTTP status
      */
-    @GetMapping("/sync")
+    @PostMapping("/sync")
     public ResponseEntity<String> syncData(@RequestBody Password password) {
         log.info("Synchronizing customer data");
         String syncStatus = customerService.syncData(password);

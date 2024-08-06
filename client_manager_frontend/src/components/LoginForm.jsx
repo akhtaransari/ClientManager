@@ -9,36 +9,38 @@ const LoginForm = () => {
   // State variables to hold email and password inputs
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  // Hook to programmatically navigate to other routes
   const navigate = useNavigate();
+
 
   // Handler function for form submission
   const handleLogin = async (e) => {
     e.preventDefault(); // Prevent the default form submission behavior
+
     try {
-      // Send a POST request to the login endpoint
-      const response = await axios.post(
-        "http://localhost:8080/api/customers/login",
-        {
-          username: email, // Use the email state as the username
-          password: password, // Use the password state
-        },
-        {
-          headers: {
-            "Content-Type": "application/json", // Set the content type to JSON
-          },
-        }
-      );
+      // Create basic authentication header
+      const base64Credentials = btoa(email + ":" + password);
+      const headers = {
+        Authorization: `Basic ${base64Credentials}`,
+        "Content-Type": "application/json",
+      };
+
+      // Make the GET request with axios
+      const response = await axios.get("http://localhost:8080/api/auth/login", {
+        headers,
+      });
+
+      // Extract the token from response headers
+      let token = response.headers["authorization"];
 
       // Log the response data and store the access token in local storage
-      localStorage.setItem("token", response.data.access_token);
-      localStorage.setItem("isLoggedIn", "true"); // Set the login status in local storage
-
+      localStorage.setItem("token", token);
+      if (token){
+        localStorage.setItem("isLoggedIn", "true"); // Set the login status in local storage
+      }
+  
       // Navigate to the dashboard page upon successful login
       navigate("/dashboard");
     } catch (error) {
-      // Log any errors encountered during the request
       console.error("Error:", error);
     }
   };
