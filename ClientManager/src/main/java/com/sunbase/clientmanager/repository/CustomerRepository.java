@@ -6,11 +6,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.util.UUID;
+
 /**
  * Repository interface for Customer entity.
  * Extends JpaRepository to provide CRUD operations and additional JPA functionalities.
  */
-public interface CustomerRepository extends JpaRepository<Customer, Long> {
+public interface CustomerRepository extends JpaRepository<Customer, String> {
 
     /**
      * Finds customers by their first name with pagination support.

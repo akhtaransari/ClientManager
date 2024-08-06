@@ -1,6 +1,9 @@
 package com.sunbase.clientmanager.service;
 
-import com.sunbase.clientmanager.dto.UserDTO;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sunbase.clientmanager.dto.CustomerDTO;
+import com.sunbase.clientmanager.dto.Password;
 import com.sunbase.clientmanager.entity.Customer;
 import com.sunbase.clientmanager.exception.ClientManagerException;
 import com.sunbase.clientmanager.repository.CustomerRepository;
@@ -10,13 +13,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.domain.*;
 import org.springframework.http.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
+
 
 /**
  * Service class for handling customer business logic.
@@ -27,6 +36,8 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Autowired
     private CustomerRepository customerRepository;
+    @Autowired
+    AuthService authService;
 
     private static final String REMOTE_API_URL = "https://qa.sunbasedata.com/sunbase/portal/api/assignment.jsp?cmd=get_customer_list";
     private static final String AUTH_URL = "https://qa.sunbasedata.com/sunbase/portal/api/assignment_auth.jsp";
@@ -37,6 +48,9 @@ public class CustomerServiceImpl implements CustomerService {
     @PersistenceContext
     private EntityManager entityManager;
 
+    @Autowired
+    PasswordEncoder passwordEncoder;
+
     /**
      * Creates a new customer.
      *
@@ -45,29 +59,36 @@ public class CustomerServiceImpl implements CustomerService {
      */
     @Override
     public Customer createCustomer(Customer customer) {
-        if (customer == null || customer.getEmail() == null || customer.getEmail().isEmpty()) {
-            throw new ClientManagerException("Customer or customer email cannot be null or empty.");
-        }
+        // Generate UUID without hyphens
+        String hexCode = UUID.randomUUID().toString().replace("-", "");
+
+        // Prefix the UUID with "test"
+        String customUuid = "test" + hexCode;
+
+        // Set the custom UUID to the customer
+        customer.setUuid(customUuid);
+
+        // Save and return the customer
         return customerRepository.save(customer);
     }
+
 
     /**
      * Updates an existing customer.
      *
-     * @param id the ID of the customer to update
+     * @param uuid the ID of the customer to update
      * @param customer the customer data to update
      * @return the updated customer
      * @throws ClientManagerException if the customer is not found
      */
-    @Override
-    public Customer updateCustomer(Long id, Customer customer) {
-        if (id == null || customer == null) {
-            throw new ClientManagerException("Customer ID or customer cannot be null.");
+    public Customer updateCustomer(String uuid, Customer customer) {
+
+        // Check if customer exists by UUID
+        if (!customerRepository.existsById(uuid)) {
+            throw new ClientManagerException("Customer not found with ID: " + uuid);
         }
-        if (!customerRepository.existsById(id)) {
-            throw new ClientManagerException("Customer not found with ID: " + id);
-        }
-        customer.setId(id);
+        // Ensure the provided customer object has the correct ID
+        customer.setUuid(uuid);
         return customerRepository.save(customer);
     }
 
@@ -110,89 +131,111 @@ public class CustomerServiceImpl implements CustomerService {
     /**
      * Retrieves a customer by ID.
      *
-     * @param id the ID of the customer
+     * @param uuid the ID of the customer
      * @return the customer
      * @throws ClientManagerException if the customer is not found
      */
     @Override
-    public Customer getCustomerById(Long id) {
-        if (id == null) {
+    public Customer getCustomerById(String uuid) {
+        if (uuid == null) {
             throw new ClientManagerException("Customer ID cannot be null.");
         }
-        return customerRepository.findById(id)
-                .orElseThrow(() -> new ClientManagerException("Customer not found with ID: " + id));
+        return customerRepository.findById(uuid)
+                .orElseThrow(() -> new ClientManagerException("Customer not found with ID: " + uuid));
     }
+
 
     /**
      * Deletes a customer by ID.
      *
-     * @param id the ID of the customer to delete
+     * @param uuid the ID of the customer to delete
      */
     @Override
-    public void deleteCustomer(Long id) {
-        if (id == null) {
+    public void deleteCustomer(String uuid) {
+        if (uuid == null) {
             throw new ClientManagerException("Customer ID cannot be null.");
         }
-        if (!customerRepository.existsById(id)) {
-            throw new ClientManagerException("Customer not found with ID: " + id);
+        if (!customerRepository.existsById(uuid)) {
+            throw new ClientManagerException("Customer not found with ID: " + uuid);
         }
-        customerRepository.deleteById(id);
+        customerRepository.deleteById(uuid);
     }
+
 
     /**
      * Syncs data by fetching customers from a remote API and saving unique customers to the database.
-     *
-     * @param jwt the JSON Web Token for authorization
      * @return a success message
      */
     @Override
-    public String syncData(String jwt) {
-        List<Customer> remoteCustomers = fetchCustomersFromRemoteApi(jwt);
-        List<Customer> localCustomers = customerRepository.findAll();
+    public String syncData(Password password) {
+        // Get the username from the authentication context
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getPrincipal().toString();
 
-        // Find unique customers by email ID
-        Set<String> localEmails = localCustomers.stream()
-                .map(Customer::getEmail)
+        // Obtain the token using the username and password
+        String token = getToken(username, password.password());
+
+        // Fetch customers from the remote API
+        List<CustomerDTO> remoteCustomers = fetchCustomersFromRemoteApi(token);
+
+        // Fetch all customers from the local database
+        List<Customer> localCustomers = customerRepository.findAll();
+        Set<String> localCustomerUUIDs = localCustomers.stream()
+                .map(Customer::getUuid)
                 .collect(Collectors.toSet());
 
-        List<Customer> newCustomers = remoteCustomers.stream()
-                .filter(customer -> customer.getEmail() != null && !localEmails.contains(customer.getEmail()))
-                .collect(Collectors.toList());
-
-        if (newCustomers.isEmpty()) {
-            throw new ClientManagerException("No new customers to sync.");
+        // Filter out new customers that are not present in the local database
+        List<Customer> newCustomers = new ArrayList<>();
+        for (CustomerDTO rc : remoteCustomers) {
+            if (!localCustomerUUIDs.contains(rc.getUuid())) {
+                Customer customer = new Customer(
+                        rc.getUuid(), rc.getFirstName(), rc.getLastName(),
+                        rc.getStreet(), rc.getAddress(), rc.getCity(),
+                        rc.getState(), rc.getEmail(), rc.getPhone());
+                newCustomers.add(customer);
+            }
         }
 
-        customerRepository.saveAll(newCustomers);
-        return "Sync Successful";
+        if (newCustomers.isEmpty()) {
+            throw new ClientManagerException("No Customers to update");
+        }
+
+        // Save all new customers to the local database
+        List<Customer> savedCustomers = customerRepository.saveAll(newCustomers);
+
+        return savedCustomers.size() + " customers added successfully";
     }
+
+
+
 
     /**
      * Fetches customers from the remote API using the provided JWT for authorization.
      *
-     * @param jwt the JSON Web Token for authorization
+     * @param token the JSON Web Token for authorization
      * @return a list of customers from the remote API
      * @throws ClientManagerException if an error occurs while fetching customers
      */
-    public List<Customer> fetchCustomersFromRemoteApi(String jwt) throws ClientManagerException {
+    public List<CustomerDTO> fetchCustomersFromRemoteApi(String token) throws ClientManagerException {
         try {
             // Set up the headers with the JWT token and other required headers
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + jwt);
+            headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
 
             // Create an HttpEntity object with the headers
             HttpEntity<Void> entity = new HttpEntity<>(headers);
 
             // Execute the API call with headers
-            ResponseEntity<List<Customer>> responseEntity = restTemplate.exchange(
+            ResponseEntity<List<CustomerDTO>> responseEntity = restTemplate.exchange(
                     REMOTE_API_URL,
                     HttpMethod.GET,
                     entity,
-                    new ParameterizedTypeReference<List<Customer>>() {}
+                    new ParameterizedTypeReference<List<CustomerDTO>>() {}
             );
 
-            List<Customer> customers = responseEntity.getBody();
+            // Get the list of customers from the response body
+            List<CustomerDTO> customers = responseEntity.getBody();
             if (customers == null || customers.isEmpty()) {
                 throw new ClientManagerException("No customers found in the response from the remote API.");
             }
@@ -209,17 +252,13 @@ public class CustomerServiceImpl implements CustomerService {
     /**
      * Retrieves an authentication token for a user.
      *
-     * @param userDTO the user credentials
+     * @param email,password the user credentials
      * @return the authentication token
      * @throws ClientManagerException if an error occurs while retrieving the token
      */
-    @Override
-    public Object getToken(UserDTO userDTO) {
+    public String getToken(String email , String password) {
         // Create JSON payload with dynamic values
-        String jsonPayload = String.format("{\"login_id\":\"%s\",\"password\":\"%s\"}", userDTO.username(), userDTO.password());
-
-        // Create an instance of RestTemplate
-        RestTemplate restTemplate = new RestTemplate();
+        String jsonPayload = String.format("{\"login_id\":\"%s\",\"password\":\"%s\"}", email, password);
 
         // Set up the headers for the request
         HttpHeaders headers = new HttpHeaders();
@@ -237,10 +276,24 @@ public class CustomerServiceImpl implements CustomerService {
                     String.class
             );
 
-            return responseEntity.getBody();
+            // Parse the response to extract the token
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode jsonNode = objectMapper.readTree(responseEntity.getBody());
 
+            // Extract the token from the JSON response
+            JsonNode tokenNode = jsonNode.get("access_token");
+            if (tokenNode != null) {
+                return tokenNode.asText();
+            } else {
+                // Handle the case where the token is not present in the response
+                throw new ClientManagerException("Token not found in the response.");
+            }
+        } catch (HttpClientErrorException e) {
+            // Log the specific HTTP error details
+            throw new ClientManagerException("HTTP error occurred while retrieving the token: " + e.getMessage());
         } catch (Exception e) {
-            throw new ClientManagerException("Token error: " + e.getMessage());
+            // Handle any other unexpected errors
+            throw new ClientManagerException("Failed to retrieve token: " + e.getMessage());
         }
     }
 }
