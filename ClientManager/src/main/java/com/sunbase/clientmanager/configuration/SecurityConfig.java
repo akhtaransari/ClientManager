@@ -32,19 +32,14 @@ public class SecurityConfig {
 
 	/**
 	 * Configures security filter chain for the application.
-	 *
-	 * @param http the HttpSecurity object
-	 * @return the SecurityFilterChain object
 	 * @throws Exception if an error occurs during configuration
 	 */
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
-		// Configure CSRF token request attribute handler
 		CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
 
 		http
-				// Configure session management to be stateless
 				.sessionManagement(sessionManagement ->
 						sessionManagement.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
 				)
@@ -59,8 +54,6 @@ public class SecurityConfig {
 							cfg.setAllowCredentials(true);
 							cfg.setAllowedHeaders(Collections.singletonList("*"));
 							cfg.setExposedHeaders(Arrays.asList("Authorization"));
-							// Log CORS configuration
-							log.info("CORS configuration applied: {}", cfg);
 							return cfg;
 						}
 					});
@@ -70,27 +63,19 @@ public class SecurityConfig {
 					auth
 							.requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
 							.requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-							.requestMatchers("/swagger-ui*/**", "/v3/api-docs/**").permitAll()
 							.anyRequest().authenticated();
-					// Log authorization rules
 					log.info("Authorization rules configured.");
 				})
-				// Disable CSRF protection
+
 				.csrf(csrf -> {
 					csrf.disable();
-					// Log CSRF configuration
 					log.info("CSRF protection disabled.");
 				})
-				// Add custom JWT token validator filter before BasicAuthenticationFilter
 				.addFilterBefore(new JwtTokenValidatorFilter(), BasicAuthenticationFilter.class)
-				// Add custom JWT token generator filter after BasicAuthenticationFilter
 				.addFilterAfter(new JwtTokenGeneratorFilter(), BasicAuthenticationFilter.class)
-				// Configure form login
 				.formLogin(Customizer.withDefaults())
-				// Configure basic authentication
 				.httpBasic(Customizer.withDefaults());
 
-		// Log security filter chain configuration
 		log.info("Security filter chain configured.");
 
 		return http.build();
@@ -98,12 +83,10 @@ public class SecurityConfig {
 
 	/**
 	 * Configures the password encoder to use BCrypt.
-	 *
-	 * @return the PasswordEncoder object
 	 */
 	@Bean
 	public PasswordEncoder passwordEncoder() {
-		// Log password encoder creation
+
 		log.info("Password encoder (BCrypt) created.");
 		return new BCryptPasswordEncoder();
 	}

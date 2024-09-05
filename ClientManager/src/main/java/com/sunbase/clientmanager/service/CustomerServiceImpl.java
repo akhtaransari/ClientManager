@@ -26,11 +26,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-
-/**
- * Service class for handling customer business logic.
- * Provides methods for CRUD operations, pagination, and synchronization.
- */
 @Service
 public class CustomerServiceImpl implements CustomerService {
 
@@ -53,9 +48,6 @@ public class CustomerServiceImpl implements CustomerService {
 
     /**
      * Creates a new customer.
-     *
-     * @param customer the customer to create
-     * @return the created customer
      */
     @Override
     public Customer createCustomer(Customer customer) {
@@ -72,46 +64,33 @@ public class CustomerServiceImpl implements CustomerService {
         return customerRepository.save(customer);
     }
 
-
     /**
      * Updates an existing customer.
-     *
-     * @param uuid the ID of the customer to update
-     * @param customer the customer data to update
-     * @return the updated customer
      * @throws ClientManagerException if the customer is not found
      */
+    @Override
     public Customer updateCustomer(String uuid, Customer customer) {
 
-        // Check if customer exists by UUID
         if (!customerRepository.existsById(uuid)) {
             throw new ClientManagerException("Customer not found with ID: " + uuid);
         }
-        // Ensure the provided customer object has the correct ID
         customer.setUuid(uuid);
         return customerRepository.save(customer);
     }
 
     /**
      * Retrieves all customers with pagination, sorting, and searching.
-     *
-     * @param page   the page number
-     * @param size   the page size
-     * @param sortBy the sort criteria
-     * @param value  the search term
-     * @return the list of customers
+     * @throws ClientManagerException if Invalid pagination or sorting parameters.
      */
     @Override
     public Page<Customer> getAllCustomers(int page, int size, String sortBy, String value) {
-        // Validate pagination and sorting parameters
+
         if (page < 0 || size <= 0) {
             throw new ClientManagerException("Invalid pagination or sorting parameters.");
         }
 
-        // Create Pageable instance with sorting
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortBy));
 
-        // Fetch data based on the sortBy parameter
         switch (sortBy.toLowerCase()) {
             case "firstname":
                 return customerRepository.findByFirstName(value, pageable);
@@ -122,7 +101,6 @@ public class CustomerServiceImpl implements CustomerService {
             case "phone":
                 return customerRepository.findByPhone(value, pageable);
             default:
-                // Handle cases where sortBy does not match any predefined fields
                 return customerRepository.findAll(pageable);
         }
     }
@@ -130,9 +108,6 @@ public class CustomerServiceImpl implements CustomerService {
 
     /**
      * Retrieves a customer by ID.
-     *
-     * @param uuid the ID of the customer
-     * @return the customer
      * @throws ClientManagerException if the customer is not found
      */
     @Override
@@ -147,8 +122,7 @@ public class CustomerServiceImpl implements CustomerService {
 
     /**
      * Deletes a customer by ID.
-     *
-     * @param uuid the ID of the customer to delete
+     * @throws ClientManagerException if the customer is not found or UUID is null
      */
     @Override
     public void deleteCustomer(String uuid) {
@@ -164,21 +138,17 @@ public class CustomerServiceImpl implements CustomerService {
 
     /**
      * Syncs data by fetching customers from a remote API and saving unique customers to the database.
-     * @return a success message
+     * @throws ClientManagerException if no customer to update
      */
     @Override
     public String syncData(Password password) {
-        // Get the username from the authentication context
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getPrincipal().toString();
 
-        // Obtain the token using the username and password
         String token = getToken(username, password.password());
 
-        // Fetch customers from the remote API
         List<CustomerDTO> remoteCustomers = fetchCustomersFromRemoteApi(token);
 
-        // Fetch all customers from the local database
         List<Customer> localCustomers = customerRepository.findAll();
         Set<String> localCustomerUUIDs = localCustomers.stream()
                 .map(Customer::getUuid)
@@ -200,20 +170,13 @@ public class CustomerServiceImpl implements CustomerService {
             throw new ClientManagerException("No Customers to update");
         }
 
-        // Save all new customers to the local database
         List<Customer> savedCustomers = customerRepository.saveAll(newCustomers);
 
         return savedCustomers.size() + " customers added successfully";
     }
 
-
-
-
     /**
      * Fetches customers from the remote API using the provided JWT for authorization.
-     *
-     * @param token the JSON Web Token for authorization
-     * @return a list of customers from the remote API
      * @throws ClientManagerException if an error occurs while fetching customers
      */
     public List<CustomerDTO> fetchCustomersFromRemoteApi(String token) throws ClientManagerException {
@@ -223,7 +186,6 @@ public class CustomerServiceImpl implements CustomerService {
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
 
-            // Create an HttpEntity object with the headers
             HttpEntity<Void> entity = new HttpEntity<>(headers);
 
             // Execute the API call with headers
@@ -234,37 +196,29 @@ public class CustomerServiceImpl implements CustomerService {
                     new ParameterizedTypeReference<List<CustomerDTO>>() {}
             );
 
-            // Get the list of customers from the response body
             List<CustomerDTO> customers = responseEntity.getBody();
             if (customers == null || customers.isEmpty()) {
                 throw new ClientManagerException("No customers found in the response from the remote API.");
             }
             return customers;
         } catch (HttpClientErrorException e) {
-            // Log the specific HTTP error details
             throw new ClientManagerException("HTTP error occurred while fetching customers from the remote API: " + e.getMessage());
         } catch (Exception e) {
-            // Handle any other unexpected errors
             throw new ClientManagerException("Failed to fetch customers from the remote API: " + e.getMessage());
         }
     }
 
     /**
      * Retrieves an authentication token for a user.
-     *
-     * @param email,password the user credentials
-     * @return the authentication token
      * @throws ClientManagerException if an error occurs while retrieving the token
      */
     public String getToken(String email , String password) {
         // Create JSON payload with dynamic values
         String jsonPayload = String.format("{\"login_id\":\"%s\",\"password\":\"%s\"}", email, password);
 
-        // Set up the headers for the request
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-Type", "application/json");
 
-        // Create the HttpEntity with the JSON payload and headers
         HttpEntity<String> requestEntity = new HttpEntity<>(jsonPayload, headers);
 
         try {
@@ -285,14 +239,11 @@ public class CustomerServiceImpl implements CustomerService {
             if (tokenNode != null) {
                 return tokenNode.asText();
             } else {
-                // Handle the case where the token is not present in the response
                 throw new ClientManagerException("Token not found in the response.");
             }
         } catch (HttpClientErrorException e) {
-            // Log the specific HTTP error details
             throw new ClientManagerException("HTTP error occurred while retrieving the token: " + e.getMessage());
         } catch (Exception e) {
-            // Handle any other unexpected errors
             throw new ClientManagerException("Failed to retrieve token: " + e.getMessage());
         }
     }

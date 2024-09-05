@@ -8,10 +8,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Entity class representing a User.
- * This class maps to a database table and is used to persist user data.
- */
 @Entity
 @Table(name = "users")
 @Data
